@@ -371,43 +371,49 @@ def.td.ind <-
 
 NFL_Play_by_Play_2009_2017_v4_csv$PlayType.new[def.td.ind] <- "Defensive Touchdown"
 
-off.td.ind <- which(
-  NFL_Play_by_Play_2009_2017_v4_csv$Touchdown == 1 &
-    !(NFL_Play_by_Play_2009_2017_v4_csv$posteam == lead(NFL_Play_by_Play_2009_2017_v4_csv$posteam) &
-    NFL_Play_by_Play_2009_2017_v4_csv$Drive != lead(NFL_Play_by_Play_2009_2017_v4_csv$Drive) &
-    !(
-      NFL_Play_by_Play_2009_2017_v4_csv$qtr == 2 &
-        lead(NFL_Play_by_Play_2009_2017_v4_csv$qtr == 3)
-    ) &
-    !(
-      NFL_Play_by_Play_2009_2017_v4_csv$qtr == 4 &
-        lead(NFL_Play_by_Play_2009_2017_v4_csv$qtr == 5)
-    )) #&
-  #NFL_Play_by_Play_2009_2017_v4_csv$DefTeamScore == lead(NFL_Play_by_Play_2009_2017_v4_csv$DefTeamScore)
-)  
+#Offensive Touchdown approach relying on Touchdown indicator, Touchdown = 1 did not confirm there was an actual Touchdown.
 
-NFL_Play_by_Play_2009_2017_v4_csv$PlayType.new[off.td.ind] <- "Offensive Touchdown"
+# off.td.ind <- which(
+#   NFL_Play_by_Play_2009_2017_v4_csv$Touchdown == 1 &
+#     !(NFL_Play_by_Play_2009_2017_v4_csv$posteam == lead(NFL_Play_by_Play_2009_2017_v4_csv$posteam) &
+#     NFL_Play_by_Play_2009_2017_v4_csv$Drive != lead(NFL_Play_by_Play_2009_2017_v4_csv$Drive) &
+#     !(
+#       NFL_Play_by_Play_2009_2017_v4_csv$qtr == 2 &
+#         lead(NFL_Play_by_Play_2009_2017_v4_csv$qtr == 3)
+#     ) &
+#     !(
+#       NFL_Play_by_Play_2009_2017_v4_csv$qtr == 4 &
+#         lead(NFL_Play_by_Play_2009_2017_v4_csv$qtr == 5)
+#     )) #&
+#   #NFL_Play_by_Play_2009_2017_v4_csv$DefTeamScore == lead(NFL_Play_by_Play_2009_2017_v4_csv$DefTeamScore)
+# )  
+# 
+# NFL_Play_by_Play_2009_2017_v4_csv$PlayType.new[off.td.ind] <- "Offensive Touchdown"
 
 #Need to take care of Def TD that are last play in the half. 
 
-#Drive Outcomes
-NFL_Play_by_Play_2009_2017_v4_csv %>%
+#Drive Outcome Summary
+drive_by_drive <- NFL_Play_by_Play_2009_2017_v4_csv %>%
   group_by(GameID, Drive) %>%
   summarise(
-    n.passattemps = sum(PassAttempt),
+    n.passattempts = sum(PassAttempt),
     n.completions = sum(PassOutcome == "Complete", na.rm = TRUE),
     n.incompletions = sum(PassOutcome == "Incomplete Pass", na.rm = TRUE),
     n.rush = sum(RushAttempt),
     n.sacks = sum(Sack),
+    n.fumbles = sum(Fumble),
+    first.downs.gained = sum(FirstDown, na.rm = TRUE),
     Drive_outcome = ifelse(
       tail(PlayType.next, 1) == "Punt",
       tail(PlayType.next, 1),
-      tail(PlayType, 1)
+      tail(PlayType.new, 1)
     ),
     last_play = tail(desc, 1),
+    last_play_type = tail(PlayType, 1),
     last_down = tail(down, 1)
   )
 
+View(drive_by_drive)
 #use for summarizing data, if drive ended in punt spit out
 NFL_Play_by_Play_2009_2017_v4_csv$ydsnet.next <- lead(NFL_Play_by_Play_2009_2017_v4_csv$ydsnet)
 
@@ -428,8 +434,8 @@ NFL_Play_by_Play_2009_2017_v4_csv$change.of.pos <-
 
 #How do we figure out off td that have been REVERSED?
 #ExPointResult Not NA and TwoPointConv
-off.td.rev.ind <- which(
-  NFL_Play_by_Play_2009_2017_v4_csv$Touchdown == 1 &
+off.td.ind.2 <- which(
+  #NFL_Play_by_Play_2009_2017_v4_csv$Touchdown == 1 &
     !(NFL_Play_by_Play_2009_2017_v4_csv$posteam == lead(NFL_Play_by_Play_2009_2017_v4_csv$posteam) &
         NFL_Play_by_Play_2009_2017_v4_csv$Drive != lead(NFL_Play_by_Play_2009_2017_v4_csv$Drive) &
         !(
@@ -441,7 +447,16 @@ off.td.rev.ind <- which(
             lead(NFL_Play_by_Play_2009_2017_v4_csv$qtr == 5)
         )) #&
   #NFL_Play_by_Play_2009_2017_v4_csv$DefTeamScore == lead(NFL_Play_by_Play_2009_2017_v4_csv$DefTeamScore)
-  & (NFL_Play_by_Play_2009_2017_v4_csv$ExPointResult == is.na | NFL_Play_by_Play_2009_2017_v4_csv$TwoPointConv == is.na)
+  & (!is.na(lead(NFL_Play_by_Play_2009_2017_v4_csv$ExPointResult)) | !is.na(lead(NFL_Play_by_Play_2009_2017_v4_csv$TwoPointConv))) &
+    NFL_Play_by_Play_2009_2017_v4_csv$PlayType != "No Play" &
+    !(NFL_Play_by_Play_2009_2017_v4_csv$Touchdown == 0)
   
 ) 
 
+NFL_Play_by_Play_2009_2017_v4_csv$PlayType.new[off.td.ind.2] <- "Offensive Touchdown"
+
+#!def.td.ind + 1
+off.td.new <- NFL_Play_by_Play_2009_2017_v4_csv$PlayType.new[(
+  !is.na(NFL_Play_by_Play_2009_2017_v4_csv$ExPointResult) |
+    !is.na(NFL_Play_by_Play_2009_2017_v4_csv$TwoPointConv)
+)] <- "Offensive Touchdown"
